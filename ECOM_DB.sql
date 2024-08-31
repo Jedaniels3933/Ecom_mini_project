@@ -9,7 +9,7 @@ phone_num VARCHAR(13) NOT NULL
 CREATE TABLE customer_accounts(
 id INT AUTO_INCREMENT PRIMARY KEY,
 user_name VARCHAR(50) NOT NULL UNIQUE,
-pasword VARCHAR(15) NOT NULL,
+password VARCHAR(15) NOT NULL,
 cust_id INT NOT NULL,
 FOREIGN KEY (cust_id) REFERENCES Customer(id)
 );

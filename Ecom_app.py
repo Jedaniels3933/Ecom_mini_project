@@ -8,6 +8,9 @@ from marshmallow import ValidationError, fields
 from sqlalchemy import select, delete
 from connection import connection
 from connection import db_name, user, password, host
+import datetime
+from sqlalchemy import exc
+
 
 app = Flask(__name__) 
 app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+mysqlconnector://root:%21%3F12ABpp@localhost/ecom'
@@ -19,33 +22,41 @@ db = SQLAlchemy(app, model_class= Base)
 ma = Marshmallow(app)
 class Customer(Base):
     __tablename__ = "customer_new"
-    id: Mapped[int] = mapped_column(primary_key= True)
-    name: Mapped[str] = mapped_column(db.String(50), nullable= False)
+    customer_id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(db.String(50), nullable=False)
     email: Mapped[str] = mapped_column(db.String(50))
     phone_num: Mapped[str] = mapped_column(db.String(13))
-    orders_new: Mapped[List["Orders_new"]] = db.relationship(back_populates= 'customer_new') 
+
+    orders_new: Mapped[List["Orders_new"]] = db.relationship("Orders_new", back_populates='customer')
  
 class Customer_accounts(Base):
     __tablename__ = "customer_accounts"
-    id: Mapped[int] = mapped_column(primary_key= True)
-    cust_id: Mapped[int] = mapped_column(db.Integer, db.ForeignKey('customer_new'), nullable= False) 
-    user_name: Mapped[str] = mapped_column(db.String(50), nullable= False)
-    password: Mapped[str] = mapped_column(db.String(15), nullable= False)
+    id: Mapped[int] = mapped_column(primary_key=True)
+    customer_id: Mapped[int] = mapped_column(db.Integer, db.ForeignKey('customer_new.customer_id'), nullable=False)
+    user_name: Mapped[str] = mapped_column(db.String(50), nullable=False)
+    password: Mapped[str] = mapped_column(db.String(15), nullable=False)
 
 class Orders_new(Base):
     __tablename__ = "orders_new"
-    id: Mapped[int] = mapped_column(primary_key= True)
-    cust_id: Mapped[int] = mapped_column(db.Integer, db.ForeignKey('customer_new'), nullable= False) 
-    date: Mapped[date] = mapped_column(db.Date, nullable= False)
-    
-    product: Mapped[List['Product']] = db.relationship(secondary= cust_id)
+    id: Mapped[int] = mapped_column(primary_key=True)
+    customer_id: Mapped[int] = mapped_column(db.Integer, db.ForeignKey('customer_new.customer_id'), nullable=False)
+    date: Mapped[str] = mapped_column(db.Date, nullable=False)
+
+    customer: Mapped["Customer"] = db.relationship("Customer", back_populates='orders_new')
+    products: Mapped[List["Product"]] = db.relationship("Product", secondary='order_products')
 
 class Product(Base):
     __tablename__ = "product"
-    id: Mapped[int] = mapped_column(primary_key= True)
-    name: Mapped[str] = mapped_column(db.String(50), nullable= False)
-    price: Mapped[float] = mapped_column(db.Float, nullable= False)
-    orders_new: Mapped[List['Orders_new']] = db.relationship(secondary= Orders_new)
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(db.String(50), nullable=False)
+    price: Mapped[float] = mapped_column(db.Float, nullable=False)
+
+    orders_new: Mapped[List["Orders_new"]] = db.relationship("Orders_new", secondary='order_products')
+
+class OrderProducts(Base):
+    __tablename__ = 'order_products'
+    order_id: Mapped[int] = mapped_column(db.ForeignKey('orders_new.id'), primary_key=True)
+    product_id: Mapped[int] = mapped_column(db.ForeignKey('product.id'), primary_key=True)
 
 class CustomerSchema(ma.SQLAlchemyAutoSchema):
     id = fields.Integer(required = False)   
@@ -225,7 +236,7 @@ def internal_server_error(error):
 if __name__ == '__main__':
     with app.app_context():
         db.create_all()
-    app.run(debug = True)   #Running successfully - Postman tests successful
+    app.run(debug = True)   
 
 
 
