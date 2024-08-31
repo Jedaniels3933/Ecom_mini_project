@@ -11,6 +11,7 @@ from connection import db_name, user, password, host
 import datetime
 from sqlalchemy import exc
 
+#Made the updates recommended , not sure what else I can do without some more help from the tutors.
 
 app = Flask(__name__) 
 app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+mysqlconnector://root:%21%3F12ABpp@localhost/ecom'
@@ -116,7 +117,7 @@ def update_customer(id):
         return jsonify({"Error": "Customer not found"}), 404
 
     try:
-        customer_data = Customer_Schema.load(request.json)
+        customer_schema = CustomerSchema()
     except ValidationError as e:
         return jsonify({"error""message"}), 400
 

@@ -27,7 +27,15 @@ date DATETIME NOT NULL,
 FOREIGN KEY (cust_id) REFERENCES Customer(id) 
 );
 
-DROP TABLE cusotmer_new;    -- Had to drop and redo _ spelled customer wrong 
+create TABLE order_products(
+id INT AUTO_INCREMENT PRIMARY KEY,
+order_id INT NOT NULL,
+product_id INT NOT NULL
+); 
+DROP TABLE order_products;
+-- had to drop this table to create a new one for mini-project 
+
+
 
 
 
