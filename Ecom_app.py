@@ -59,78 +59,85 @@ class OrderProducts(Base):
     order_id: Mapped[int] = mapped_column(db.ForeignKey('orders_new.id'), primary_key=True)
     product_id: Mapped[int] = mapped_column(db.ForeignKey('product.id'), primary_key=True)
 
-class CustomerSchema(ma.SQLAlchemyAutoSchema):
+class CustomerSchema(ma.Schema):
     id = fields.Integer(required = False)   
     customer_name = fields.String(required = True) 
     email = fields.String()
-    phone = fields.String() 
-
+    phone_num = fields.String() 
+    user_name = fields.String(required = True)
+    password = fields.String(required = True)
     class Meta:
-        fields = ('id', 'name', 'email', 'phone')
+        fields = ('id', 'name', 'email', 'phone_num', 'user_name', 'password')
 
-class OrdersSchema(ma.SQLAlchemyAutoSchema):
+class OrdersSchema(ma.Schema):
     id = fields.Integer(required = False)
-    order_date = fields.Date(required = True)
+    date = fields.Date(required = True)
     customer_id = fields.Integer(required = True)
 
     class Meta:
-        fields = ('id', 'order_date', 'cust_id', 'products')
+        fields = ('id', 'date', 'customer_id', 'products')
 
-class ProductsSchema(ma.SQLAlchemyAutoSchema):
+class ProductsSchema(ma.Schema):
     id = fields.Integer(required = False)
     product_name = fields.String(required = True)
     price = fields.Float(required = True)
 
     class Meta:
         fields = ('id', 'product_name', 'price')
+customer_schema = CustomerSchema()
+customers_schema = CustomerSchema(many= True)
+
+order_schema = OrdersSchema()
+orders_schema = OrdersSchema(many= True)
+
+product_schema = ProductsSchema()
+products_schema = ProductsSchema(many= True)
 
 @app.route('/')
 def home():
     return "Welcome to the E-commerce API" 
 
-@app.route('/customer', methods= ['POST'])
+@ app.route("/customers", methods = ['POST'])
 def add_customer():
-    customer = Customer(name= request.json['name'], email= request.json['email'], phone_num= request.json['phone_num'])
-    db.session.add(customer)
+    try:
+        customer_data = customer_schema.load(request.json)
+    except ValidationError as e:
+        return jsonify(e.message), 400
+    
+    new_customer = Customer(user_name = customer_data['user_name'], email= customer_data['email'], phone = customer_data['phone'], username = customer_data['user_name'], password = customer_data['password'])
+    db.session.add(new_customer)
     db.session.commit()
-    return jsonify("Customer added successfully")
+    return jsonify({'Message':"Customer added correctly."}), 201
 
-@app.route('/customer', methods= ['GET'])
-def get_customer():
-    customers = Customer.query.all()
-    result = Customers_Schema.dump(customers)
-    return jsonify(result)
 
-@app.route('/customer/<int:id>', methods= ['GET'])
-def get_customers():
-    query= select(Customer) 
+
+
+
+@app.route("/customers", methods = ['GET'])
+def get_all_customers():
+    query = select(Customer)
     result = db.session.execute(query).scalars()
-    customers= result.all()
-    return Customers_Schema.jsonify(customers)
+    customers = result.all()
+
+    return customers_schema.jsonify(customers)
+
+
 
 @app.route("/customers/<int:id>", methods = ["PUT"])
 def update_customer(id):
     query = select(Customer).where(Customer.id == id)
-    result = db.session.execute(query).scalars()
-
+    result = db.session.execute(query).scalar()
     if result is None:
-        return jsonify({"Error": "Customer not found"}), 404
-
-    try:
-        customer_schema = CustomerSchema()
-    except ValidationError as e:
-        return jsonify({"error""message"}), 400
-
+        return jsonify({"Error": "No customer found"}), 404
     customer = result
     try:
-        date = Customer_Schema.load
+        customer_data = customer_schema.load(request.json)
     except ValidationError as e:
         return jsonify(e.messages), 400
-    
-    for field,value in customer_data.items():
+    for field, value in customer_data.items():
         setattr(customer, field, value)
     db.session.commit()
-    return jsonify({"message": "Customer updated successfully"}), 200
+    return jsonify({"Message":"Customer detail has been update. Thank you."})
 
 
 @app.route("/customers/<int:id>", methods = ["DELETE"])
@@ -146,20 +153,20 @@ def delete_customer(id):
 
 @app.route('/customer_accounts', methods=['POST'])
 def create_customer_account():
-    data = request.get_json()
     try:
-        hashed_password = generate_password_hash(data['password'])
-        new_account = CustomerAccount(user_name=data['user_name'], password=hashed_password, customer_id=data['customer_id'])
-        db.session.add(new_account)
-        db.session.commit()
-        return jsonify({'message': 'Customer account created', 'id': new_account.id}), 201
-    except SQLAlchemyError as e:
-        return jsonify({'error': str(e)}), 400
+        customer_account_data = CustomerSchema.load(request.json)
+    except ValidationError as e:
+        return jsonify(e.messages), 400
+    new_customer_account = Customer_accounts(customer_id=customer_account_data['id'], user_name=customer_account_data['user_name'], password=customer_account_data['password'])
+    db.session.add(new_customer_account)
+    db.session.commit()
+    return jsonify({"message": "Customer account created successfully"}), 201   
+
     
 @app.route("/products", methods=['POST'])
 def add_product():
     try:
-        product_data = Product_Schema.load(request.json)
+        product_data = ProductsSchema.load(request.json)
     except ValidationError as e:
         return jsonify(e.messages), 400
     
@@ -167,46 +174,52 @@ def add_product():
     db.session.add(new_product)
     db.session.commit()
     return jsonify({"message": "Product added successfully"}), 201
+
 @app.route('/products/<int:id>', methods=['DELETE']) # I got some help from another student 
 def delete_product(id):
-    product = Product.query.get_or_404(id)
-    try:
-        db.session.delete(product)
-        db.session.commit()
-        return jsonify({'message': 'Product deleted'})
-    except SQLAlchemyError as e:
-        return jsonify({'error': str(e)}), 400
+    query = delete(Product).where(Product.id == id)
+
+    result = db.session.execute(query)
+
+    if result.rowcount == 0:
+        return jsonify({"Message": "Product cannot be found"}), 404
+    
+    db.session.commit()
+    return jsonify({"Message": "This item has been deleted from the inventory. Thank you!"}), 200
 
 @app.route("/product", methods=['GET'])
 def get_products():
     query = select(Product)
     result = db.session.execute(query).scalars()
     products = result.all()
-    return Products_Schema.jsonify(products)
+    return ProductsSchema.jsonify(products)
 
-def make_order():
-    data = request.get_json()
+@app.route("/products/<int:id>", methods=['PUT'])
+def update_product(id):
+    query = select(Product).where(Product.id == id)
+    result = db.session.execute(query).scalar()
+    if result is None:
+        return jsonify({"Error": "Product not found"}), 404
+    product = result
     try:
-        new_order = Orders_new(customer_id=data['cust_id'], date=datetime.utcnow())
-        for i in data['products']:
-            order_item = Orders_new(order_id=new_order.id, product_id=i['product_id'], quantity=i['quantity'])
-            db.session.add(make_order)
-        db.session.add(new_order)
-        db.session.commit()
-        return jsonify({'message': 'Order placed', 'id': new_order.id}), 201
-    except SQLAlchemyError as e:
-        return jsonify({'error': str(e)}), 400
+        product_data = ProductsSchema.load(request.json)
+    except ValidationError as e:
+        return jsonify(e.messages), 400
+    for field, value in product_data.items():
+        setattr(product, field, value)
+    db.session.commit()
+    return jsonify({"Message": "Product updated successfully"}), 200
     
 @app.route("/orders_new", methods=['POST'])
 def add_order():
     try:
-        order_data = Orders_Schema.load(request.json)
+        order_data = OrdersSchema.load(request.json)
     except ValidationError as e:
         return jsonify(e.messages), 400
     new_order = Orders_new(order_date = date.today(), customer_id = order_data['cust_id'])
 
-    for item_id in order_data['items']:
-        query = select(Products).where(Products.id == item_id)
+    for order_id in order_data['items']:
+        query = select(Product).where(Product.id == order_id)
         item = db.session.execute(query).scalar()
         new_order.products.append(item)
 
@@ -214,30 +227,33 @@ def add_order():
     db.session.commit()
     return jsonify({"Message": "New order placed!"}), 201
 
-
+@app.route("/orders_new", methods=['GET'])
+def get_orders():
+    query = select(Orders_new)
+    result = db.session.execute(query).scalars()
+    orders = result.all()
+    return OrdersSchema.jsonify(orders)
 @app.route("/order_items/<int:id>", methods = ['GET'])
 def order_items(id):
     query = select(Orders_new).where(Orders_new.id == id)     
     order = db.session.execute(query).scalar()
+    if order is None:
+        return jsonify({"Error": "Order not found"}), 404
 
-    return Products_Schema.jsonify(order.products)
+    return ProductsSchema.jsonify(order.products)
    
-app.register_error_handler(404)
-def not_found(error):
-    return jsonify({'error': 'Not found'}), 404
-app.register_error_handler(400)
-def bad_request(error):
-    return jsonify({'error': 'Bad request'}), 400
-app.register_error_handler(500)
-def internal_server_error(error):
-    return jsonify({'error': 'Internal server error'}), 500
+
 
 
 
 if __name__ == '__main__':
-    with app.app_context():
-        db.create_all()
     app.run(debug = True)   
+
+# get_orders()
+# order_items()
+# add_order()
+# delete_product()    Testing and working 
+add_customer()
 
 
 
